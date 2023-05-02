@@ -1,5 +1,5 @@
 use crossterm::{
-    event::{EnableMouseCapture, KeyCode, KeyEvent, KeyModifiers},
+    event::{EnableMouseCapture, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -63,10 +63,7 @@ fn play() -> Result<(), Box<dyn Error>> {
     let mut stdout = std::io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
-    run(
-        Terminal::new(backend)?,
-        prompts.into_iter().filter(|p| p.text.contains('"')),
-    )?;
+    run(Terminal::new(backend)?, prompts)?;
     info!("Restoring terminal");
     execute!(std::io::stdout(), LeaveAlternateScreen)?;
     disable_raw_mode()?;
@@ -92,6 +89,7 @@ fn run<D: Backend>(
                 }
                 Event::Key(KeyEvent {
                     code: KeyCode::Right,
+                    kind: KeyEventKind::Press,
                     ..
                 }) => {
                     info!("Skipping prompt");
