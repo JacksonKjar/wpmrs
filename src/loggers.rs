@@ -4,6 +4,19 @@ use std::{
     sync::Mutex,
 };
 
+pub struct SimpleLogger;
+impl log::Log for SimpleLogger {
+    fn enabled(&self, _metadata: &log::Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &log::Record) {
+        println!("{}", record.args());
+    }
+
+    fn flush(&self) {}
+}
+
 pub struct FileLogger {
     writer: Mutex<BufWriter<File>>,
 }
@@ -30,11 +43,11 @@ impl log::Log for FileLogger {
 }
 
 #[derive(Default)]
-pub struct DelayedLogger {
+pub struct DeferredLogger {
     buf: Mutex<Vec<u8>>,
 }
 
-impl DelayedLogger {
+impl DeferredLogger {
     pub const fn new() -> Self {
         Self {
             buf: Mutex::new(Vec::new()),
@@ -42,8 +55,8 @@ impl DelayedLogger {
     }
 }
 
-impl log::Log for DelayedLogger {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
+impl log::Log for DeferredLogger {
+    fn enabled(&self, _metadata: &log::Metadata) -> bool {
         true
     }
 

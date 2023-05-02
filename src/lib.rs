@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
-use log::{debug, info};
+use log::debug;
 
-use tui::{
+use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Span, Spans},
@@ -66,7 +66,7 @@ impl TypeRacePrompt {
 }
 
 impl Widget for &TypeRacePrompt {
-    fn render(self, area: Rect, buf: &mut tui::buffer::Buffer) {
+    fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         //TODO: fix ASCII assumption
         let (correct, mistakes) = self.split_input();
         let remaining = self.prompt.get(self.input.len()..).unwrap_or_default();
@@ -76,7 +76,7 @@ impl Widget for &TypeRacePrompt {
         let mistakes = Span::styled(mistakes, red);
         let remaining = Span::raw(remaining);
         let spans = Spans(vec![correct, mistakes, remaining]);
-        let paragraph = Paragraph::new(spans).wrap(Wrap { trim: false });
+        let paragraph = Paragraph::new(spans).wrap(Wrap { trim: true });
         paragraph.render(area, buf);
     }
 }

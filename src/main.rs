@@ -9,20 +9,19 @@ use std::{
     error::Error,
     fs::File,
     io::{BufReader, BufWriter},
-    time::Duration,
 };
-use wpm::{loggers::DelayedLogger, webscraping::typeracerdata::TextRow, TypeRacePrompt};
+use wpm::{loggers::DeferredLogger, webscraping::typeracerdata::TextRow, TypeRacePrompt};
 
-use crossterm::event::{poll, read, Event};
+use crossterm::event::{read, Event};
 
-use tui::{
+use ratatui::{
     backend::{Backend, CrosstermBackend},
-    layout::Rect,
-    Terminal,
+    layout::Margin,
+    Frame, Terminal,
 };
 
 fn main() {
-    static LOGGER: DelayedLogger = DelayedLogger::new();
+    static LOGGER: DeferredLogger = DeferredLogger::new();
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(log::LevelFilter::Info);
     debug!("Parsing args");
@@ -64,18 +63,24 @@ fn play() -> Result<(), Box<dyn Error>> {
     let mut stdout = std::io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
-    run(Terminal::new(backend)?, prompts)?;
+    run(
+        Terminal::new(backend)?,
+        prompts.into_iter().filter(|p| p.text.contains('"')),
+    )?;
     info!("Restoring terminal");
     execute!(std::io::stdout(), LeaveAlternateScreen)?;
     disable_raw_mode()?;
     Ok(())
 }
 
-fn run<D: Backend>(mut terminal: Terminal<D>, prompts: Vec<TextRow>) -> Result<(), Box<dyn Error>> {
-    terminal.hide_cursor()?;
+fn run<D: Backend>(
+    mut terminal: Terminal<D>,
+    prompts: impl IntoIterator<Item = TextRow>,
+) -> Result<(), Box<dyn Error>> {
     for mut prompt in prompts.into_iter().map(|tr| TypeRacePrompt::new(tr.text)) {
         info!("Starting race");
-        while !prompt.is_complete() && poll(Duration::from_secs(2))? {
+        terminal.draw(|f| redraw(f, prompt.clone()))?;
+        while !prompt.is_complete() {
             match read()? {
                 Event::Key(KeyEvent {
                     code: KeyCode::Char('c'),
@@ -85,13 +90,16 @@ fn run<D: Backend>(mut terminal: Terminal<D>, prompts: Vec<TextRow>) -> Result<(
                     info!("Kill signal received: Exiting race");
                     return Ok(());
                 }
+                Event::Key(KeyEvent {
+                    code: KeyCode::Right,
+                    ..
+                }) => {
+                    info!("Skipping prompt");
+                    break;
+                }
                 Event::Key(ke) => {
                     prompt.apply_key(ke);
-                    terminal.draw(|f| {
-                        let size = f.size();
-                        let rect = Rect::new(10, 10, size.width - 20, size.height - 20);
-                        f.render_widget(&prompt.clone(), rect);
-                    })?;
+                    terminal.draw(|f| redraw(f, prompt.clone()))?;
                 }
                 _ => (),
             }
@@ -103,4 +111,13 @@ fn run<D: Backend>(mut terminal: Terminal<D>, prompts: Vec<TextRow>) -> Result<(
         }
     }
     Ok(())
+}
+
+fn redraw<B: Backend>(frame: &mut Frame<B>, prompt: TypeRacePrompt) {
+    let size = frame.size();
+    let margin = Margin {
+        vertical: 5,
+        horizontal: 5,
+    };
+    frame.render_widget(&prompt, size.inner(&margin));
 }
